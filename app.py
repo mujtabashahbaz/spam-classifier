@@ -4,26 +4,31 @@ import re
 import nltk
 import scipy.sparse
 
+# Load NLTK stopwords
 nltk.download('stopwords')
 from nltk.corpus import stopwords
 
-# Load trained model and vectorizer
+# Load pre-trained model and vectorizer
 model = joblib.load("spam_classifier.pkl")
 vectorizer = joblib.load("vectorizer.pkl")
 
-# Spam-related keywords
-spam_keywords = ["urgent", "compromised", "verify", "click", "secure", "free", "win", "account", "suspended"]
+# Phishing keywords with weights
+spam_keywords = {
+    "urgent": 5, "compromised": 5, "verify": 4, "click": 3, "secure": 3,
+    "free": 2, "win": 2, "account": 3, "suspended": 4
+}
 
-# Function to clean text
+# Text preprocessing function
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r'\W', ' ', text)  # Remove non-word characters
+    text = re.sub(r'\W', ' ', text)  # Remove special characters
     text = re.sub(r'\s+', ' ', text).strip()  # Remove extra spaces
     return text
 
+# Count phishing words
 def count_spam_words(text):
     words = text.split()
-    return sum(1 for word in words if word in spam_keywords)
+    return sum(spam_keywords.get(word, 0) for word in words)
 
 app = Flask(__name__)
 
@@ -34,14 +39,16 @@ def index():
         email_text = request.form["email_text"]
         cleaned_text = clean_text(email_text)
         
-        # Transform input
-        transformed_text = vectorizer.transform([cleaned_text])
-        spam_word_count = count_spam_words(cleaned_text)
-        input_features = scipy.sparse.hstack((transformed_text, [[spam_word_count]]))
-
-        # Predict spam or ham
-        result = model.predict(input_features)
-        prediction = "Spam" if result[0] == 1 else "Not Spam"
+        # Rule-based check for phishing
+        if any(word in cleaned_text for word in spam_keywords.keys()):
+            prediction = "Spam (Phishing detected)"
+        else:
+            # Machine learning prediction
+            transformed_text = vectorizer.transform([cleaned_text])
+            spam_word_count = count_spam_words(cleaned_text)
+            input_features = scipy.sparse.hstack((transformed_text, [[spam_word_count]]))
+            result = model.predict(input_features)
+            prediction = "Spam" if result[0] == 1 else "Not Spam"
 
     return render_template("index.html", prediction=prediction)
 

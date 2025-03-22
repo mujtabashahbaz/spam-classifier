@@ -4,9 +4,3 @@ scikit-learn
 nltk
 joblib
 gunicorn
-Flask
-pandas
-scikit-learn
-nltk
-joblib
-gunicorn
